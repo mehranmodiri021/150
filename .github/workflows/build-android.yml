@@ -1,0 +1,121 @@
+name: Build Android Artifacts
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Create Mock .env for Build Secrets
+        run: |
+          touch .env
+          echo "TAPSELL_APP_KEY=${{ secrets.TAPSELL_APP_KEY }}" >> .env
+          echo "TAPSELL_REWARDED_ZONE_ID=${{ secrets.TAPSELL_REWARDED_ZONE_ID }}" >> .env
+          echo "TAPSELL_BANNER_ZONE_ID=${{ secrets.TAPSELL_BANNER_ZONE_ID }}" >> .env
+          echo "TAPSELL_INTERSTITIAL_ZONE_ID=${{ secrets.TAPSELL_INTERSTITIAL_ZONE_ID }}" >> .env
+          echo "BAZAAR_PUBLIC_KEY=${{ secrets.BAZAAR_PUBLIC_KEY }}" >> .env
+
+      - name: Decode Keystore (Optional Release Signing)
+        id: decode_keystore
+        run: |
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > my-upload-key.jks
+            echo "KEYSTORE_PATH=${GITHUB_WORKSPACE}/my-upload-key.jks" >> $GITHUB_ENV
+            echo "STORE_PASSWORD=${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "keystore_decoded=true" >> $GITHUB_OUTPUT
+          else
+            echo "No custom keystore secret provided. Falling back to debug keystore for signing."
+            echo "keystore_decoded=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build APK (Release & Debug)
+        run: |
+          gradle :app:assembleRelease :app:assembleDebug --stacktrace
+
+      - name: Build Android App Bundle (AAB)
+        run: |
+          gradle :app:bundleRelease --stacktrace
+
+      - name: Prepare Cafe Bazaar BIN Package & Collect Artifacts
+        run: |
+          mkdir -p build_output/bazaar
+          
+          # Find Release APK (or Debug APK fallback)
+          RELEASE_APK=$(find app/build/outputs/ -name "*release*.apk" | head -n 1)
+          if [ -z "$RELEASE_APK" ]; then
+            RELEASE_APK=$(find app/build/outputs/apk/ -name "*.apk" | head -n 1)
+          fi
+          
+          if [ -n "$RELEASE_APK" ]; then
+            echo "Found APK: $RELEASE_APK"
+            # 1. Cafe Bazaar .bin package (Standard Cafe Bazaar format for APK upload)
+            cp "$RELEASE_APK" build_output/bazaar/arena_clash_bazaar.bin
+            # 2. Standalone APK
+            cp "$RELEASE_APK" build_output/arena_clash_release.apk
+          else
+            echo "Warning: No APK found under app/build/outputs/"
+          fi
+
+          # 3. Android App Bundle (.aab)
+          RELEASE_AAB=$(find app/build/outputs/ -name "*.aab" | head -n 1)
+          if [ -n "$RELEASE_AAB" ]; then
+            echo "Found AAB: $RELEASE_AAB"
+            cp "$RELEASE_AAB" build_output/arena_clash_release.aab
+          fi
+
+          ls -la build_output/
+          ls -la build_output/bazaar/
+
+      - name: Upload APKs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArenaClash-APK
+          path: |
+            app/build/outputs/apk/**/*.apk
+            build_output/*.apk
+          if-no-files-found: warn
+
+      - name: Upload Android App Bundle (AAB) Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArenaClash-AAB
+          path: |
+            app/build/outputs/bundle/**/*.aab
+            build_output/*.aab
+          if-no-files-found: warn
+
+      - name: Upload Cafe Bazaar BIN Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArenaClash-CafeBazaar-BIN
+          path: build_output/bazaar/arena_clash_bazaar.bin
+          if-no-files-found: warn
