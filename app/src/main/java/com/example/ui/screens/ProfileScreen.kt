@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -32,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.domain.model.MatchHistoryItem
 import com.example.domain.model.UserProfile
 import com.example.ui.components.RankBadge
@@ -85,7 +88,7 @@ fun ProfileScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(80.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surface)
                             .border(
@@ -95,7 +98,11 @@ fun ProfileScreen(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "⚔️", fontSize = 36.sp)
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_arena_logo),
+                            contentDescription = userProfile.username,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))

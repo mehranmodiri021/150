@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,10 +53,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.config.EconomyConfig
 import com.example.domain.model.ChallengeDifficulty
 import com.example.domain.model.ChallengeItem
@@ -456,6 +459,20 @@ fun ArenaScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, if (score >= EconomyConfig.BASE_WIN_SCORE_THRESHOLD) Color(0xFFFFD700) else Color(0xFF00E5FF), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_arena_logo),
+                            contentDescription = "Arena Trophy",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "${strings.finalScore}: $score",
                         fontSize = 24.sp,

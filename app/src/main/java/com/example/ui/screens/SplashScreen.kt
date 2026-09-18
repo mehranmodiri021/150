@@ -9,16 +9,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -45,21 +51,21 @@ fun SplashScreen(
     onSplashFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scale = remember { Animatable(0.85f) }
+    val scale = remember { Animatable(0.88f) }
     val alpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
         // Smooth entrance animation
         scale.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
         )
         alpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 600)
+            animationSpec = tween(durationMillis = 400)
         )
-        // Short, responsive splash duration
-        delay(1100)
+        // Exactly 3 seconds display as requested before entering main game screen
+        delay(3000)
         onSplashFinished()
     }
 
@@ -69,9 +75,9 @@ fun SplashScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF060913),
+                        Color(0xFF070B14),
                         Color(0xFF0F172A),
-                        Color(0xFF070B14)
+                        Color(0xFF050811)
                     )
                 )
             )
@@ -80,77 +86,121 @@ fun SplashScreen(
             .testTag("screen_splash"),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(24.dp)
-        ) {
-            // Official App Icon (matching launcher adaptive icon)
-            Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .scale(scale.value)
-                    .clip(CircleShape)
-                    .border(3.dp, Color(0xFF00E5FF), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_arena_logo),
-                    contentDescription = "Arena Clash Official Logo",
-                    modifier = Modifier.fillMaxSize()
+        // Elegant highlighted card containing App Image, App Name, and Developer Name
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .scale(scale.value)
+                .alpha(alpha.value)
+                .shadow(
+                    elevation = 20.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    ambientColor = Color(0xFF00E5FF).copy(alpha = 0.3f),
+                    spotColor = Color(0xFF00E5FF).copy(alpha = 0.5f)
+                ),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF131D33).copy(alpha = 0.95f),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 2.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF00E5FF),
+                        Color(0xFF005599),
+                        Color(0xFF00E5FF).copy(alpha = 0.4f)
+                    )
                 )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // App Name
-            Text(
-                text = AppConfig.APP_NAME_EN,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                letterSpacing = 1.sp,
-                modifier = Modifier.alpha(alpha.value)
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = AppConfig.APP_NAME_FA,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF00E5FF),
-                modifier = Modifier.alpha(alpha.value)
-            )
-
-            Spacer(modifier = Modifier.height(36.dp))
-
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                color = Color(0xFF00E5FF),
-                strokeWidth = 2.5.dp
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Developer attribution as specified
+        ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.alpha(alpha.value)
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(vertical = 32.dp, horizontal = 20.dp)
             ) {
+                // 1. App Image / Official Logo
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFF070C18))
+                        .border(2.5.dp, Color(0xFF00E5FF), RoundedCornerShape(22.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_arena_logo),
+                        contentDescription = "Arena Clash Official Logo",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // 2. App Name (Both English and Persian)
                 Text(
-                    text = "توسعه‌دهنده:",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    text = AppConfig.APP_NAME_EN,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    letterSpacing = 1.2.sp
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = AppConfig.APP_NAME_FA,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00E5FF)
+                )
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                // Divider Line
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .height(1.5.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color(0xFF00E5FF).copy(alpha = 0.7f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // 3. Developer Name: Seyed Hamid Mousavizadeh
+                Text(
+                    text = "نام سازنده:",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.75f)
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = AppConfig.DEVELOPER_NAME,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFFFFD700),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(26.dp))
+
+                // Subtle modern loading indicator for remaining time
+                CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    color = Color(0xFF00E5FF),
+                    strokeWidth = 2.5.dp
                 )
             }
         }
     }
 }
+
