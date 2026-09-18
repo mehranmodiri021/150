@@ -1,0 +1,6 @@
+{
+  "name": "Arena Clash",
+  "description": "Arena Clash (Challenge Arena) - Competitive speed, reflex, and logic duel game for Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
