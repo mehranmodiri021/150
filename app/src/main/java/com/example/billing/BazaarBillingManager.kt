@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentSender
 import android.content.ServiceConnection
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -25,6 +26,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 sealed class PurchaseResult {
+    // بازگرداندن PendingIntent واقعی برای اجرا در Activity (اصلاح مشکل عدم نمایش صفحه پرداخت)
+    data class LaunchIntent(val pendingIntent: PendingIntent, val payload: String) : PurchaseResult()
     data class Success(val productId: String, val purchaseToken: String, val payload: String) : PurchaseResult()
     data class Error(val errorType: BillingError, val userFriendlyMessage: String) : PurchaseResult()
     data object Canceled : PurchaseResult()
@@ -168,7 +171,7 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
     }
 
     /**
-     * Launches real purchase flow.
+     * Launches real purchase flow and returns PendingIntent to be launched by Activity.
      */
     suspend fun launchPurchase(
         productId: String,
@@ -220,19 +223,9 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
                     val pendingIntent = buyIntentBundle?.getParcelable<PendingIntent>("BUY_INTENT")
                     if (pendingIntent != null) {
                         Log.d(TAG, "Real Cafe Bazaar BuyIntent received successfully for $productId")
-                        // In real production environment without interactive IntentSender in background,
-                        // we verify active purchases via restore/getPurchases.
-                        restorePurchases { success, purchases, _ ->
-                            if (success && purchases.contains(productId)) {
-                                _billingState.value = BillingState.PurchaseSuccess(productId, "verified")
-                                onResult(PurchaseResult.Success(productId, "verified", payload))
-                            } else {
-                                _billingState.value = BillingState.PurchaseFailed(
-                                    BillingError.USER_CANCELED,
-                                    "پرداخت توسط کاربر لغو شد یا تراکنش کامل نشد."
-                                )
-                                onResult(PurchaseResult.Canceled)
-                            }
+                        withContext(Dispatchers.Main) {
+                            // بازگرداندن PendingIntent به اکتیویتی جهت اجرای startIntentSenderForResult
+                            onResult(PurchaseResult.LaunchIntent(pendingIntent, payload))
                         }
                     } else {
                         withContext(Dispatchers.Main) {
@@ -244,14 +237,14 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
                         }
                     }
                 } else if (responseCode == 7) {
-                    // Item already owned - restore it
+                    // Item already owned - restore it securely
                     Log.d(TAG, "Item already owned: $productId. Restoring...")
                     restorePurchases { success, purchases, _ ->
                         if (success && purchases.contains(productId)) {
                             _billingState.value = BillingState.PurchaseSuccess(productId, "restored_owned")
                             onResult(PurchaseResult.Success(productId, "restored_owned", payload))
                         } else {
-                            onResult(PurchaseResult.Error(BillingError.ITEM_ALREADY_OWNED, "این محصول قبلاً خریداری شده است."))
+                            onResult(PurchaseResult.Error(BillingError.ITEM_ALREADY_OWNED, "این محصول قبلاً خریداری شده است اما در بازیابی تأیید نشد."))
                         }
                     }
                 } else {
@@ -275,7 +268,7 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
 
     /**
      * Real purchase verification and delivery.
-     * Validates cryptographic signature using Cafe Bazaar Public Key.
+     * Validates cryptographic signature using Cafe Bazaar Public Key securely.
      */
     fun handlePurchaseResult(
         purchaseData: String,
@@ -287,17 +280,16 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
             return
         }
 
-        // Cryptographic signature check if public key configured
-        val isVerified = if (BazaarConfig.isConfigured) {
+        // بررسی امنیتی RSA: در صورت تنظیم نبودن کلید عمومی، خرید هرگز تأیید نمی‌شود (رفع باگ امنیتی پاسخ جعلی)
+        val isVerified = if (BazaarConfig.isConfigured && BazaarConfig.BAZAAR_PUBLIC_KEY.isNotBlank()) {
             SecurityHelper.verifyPurchase(
                 base64PublicKey = BazaarConfig.BAZAAR_PUBLIC_KEY,
                 signedData = purchaseData,
                 signature = dataSignature
             )
         } else {
-            // When public key not yet provided in Secrets panel, log warning
-            Log.w(TAG, "Bazaar public key not configured in .env / Secrets panel. Skipping cryptographic signature verification.")
-            true
+            Log.e(TAG, "Bazaar public key is missing or not configured! Security verification rejected.")
+            false
         }
 
         if (!isVerified) {
@@ -330,7 +322,7 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
 
     /**
      * Restores real purchases from Cafe Bazaar.
-     * Queries getPurchases AIDL, verifies signatures, and extracts active items.
+     * Queries getPurchases AIDL, verifies signatures securely, and extracts active items.
      */
     suspend fun restorePurchases(onResult: (Boolean, List<String>, String?) -> Unit) {
         if (!isNetworkAvailable()) {
@@ -366,10 +358,11 @@ class BazaarBillingManager private constructor(private val appContext: Context) 
                         val data = purchaseDataList[i]
                         val sig = signatureList.getOrNull(i) ?: ""
 
-                        val isVerified = if (BazaarConfig.isConfigured) {
+                        // اعتبارسنجی امنیتی RSA برای اقلام بازیابی‌شده (جلوگیری از دور زدن امنیت)
+                        val isVerified = if (BazaarConfig.isConfigured && BazaarConfig.BAZAAR_PUBLIC_KEY.isNotBlank()) {
                             SecurityHelper.verifyPurchase(BazaarConfig.BAZAAR_PUBLIC_KEY, data, sig)
                         } else {
-                            true
+                            false
                         }
 
                         if (isVerified) {
